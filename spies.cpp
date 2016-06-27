@@ -4,251 +4,272 @@
 #include <iostream>
 #include <random>
 #include <algorithm>
+//#include <atomic>
+//#include <condition_variable>
+//#include <mutex>
+#include <cmath>
+//#include <cassert>
 using namespace std;
 
-#define N 8
-#define tc 0
-#define maxMoves 2 * N
-#define debug
+#define N 41
+#define tc 8
+#define maxMoves 15
+//#define debug
 
 typedef vector<vector<unsigned> > Board;
 
 volatile bool solved = false; //For stopping other threads early.
+//atomic_uint games;
+//condition_variable cv;
 
 //Board access: [row][column]
 
-inline unsigned gcd( int x, int y ){
-    if( x < y ) swap( x, y );
+inline int gcd( int x, int y ){
+	if( x < y ) swap( x, y );
 
-    while( y > 0 ){
-        const int f = x % y;
-        x = y;
-        y = f;
-    }
-    return x;
+	while( y > 0 ){
+		const int f = x % y;
+		x = y;
+		y = f;
+	}
+	return x;
 }
 
 void attack(Board& board, const vector<unsigned>& pos){
 
-    for (auto& row : board){ //Reset all the attack values in the board.
-        fill(row.begin(), row.end(), 0);
-    }
+	for (auto& row : board){ //Reset all the attack values in the board.
+		fill(row.begin(), row.end(), 0);
+	}
 
-    for (unsigned row = 0; row < N; ++row){
+	for (unsigned row = 0; row < N; ++row){
 
-        const unsigned col = pos[row];
+		const unsigned col = pos[row];
 
-        //Block out cols
-        /* We can skip this now that all positions are force to be on their own row and column via swap
+		//Block out cols
+		/* We can skip this now that all positions are force to be on their own row and column via swap
         for (unsigned i = 0; i < N; ++i){
             //increment every rows column equal to this queens col, skip this row.
             if (i == row) continue;
             board[i][col]++;
         }
-        */
+		 */
 
-        //Block left horizontals
-        if (col <= row){
-            for (unsigned y = row - col, x = 0; y < N; ++x, ++y){ //y will grow to N faster so skip checking x
-                if (y == row) continue; //Skip ourself, we can't attack ourself
-                board[y][x]++;
-            }
-        } else {
-            for (unsigned y = 0, x = col - row; x < N; ++x, ++y){
-                if (y == row) continue; //Skip ourself, we can't attack ourself
-                board[y][x]++;
-            }
-        }
+		//Block left horizontals
+		if (col <= row){
+			for (unsigned y = row - col, x = 0; y < N; ++x, ++y){ //y will grow to N faster so skip checking x
+				if (y == row) continue; //Skip ourself, we can't attack ourself
+				board[y][x]++;
+			}
+		} else {
+			for (unsigned y = 0, x = col - row; x < N; ++x, ++y){
+				if (y == row) continue; //Skip ourself, we can't attack ourself
+				board[y][x]++;
+			}
+		}
 
-        //Block right horizontals
-        const unsigned iy = N - row - 1;
-        if (iy <= col){
-            for (unsigned y = N - 1, x = col - iy; x < N; --y, ++x){
-                if (y == row) continue;
-                board[y][x]++;
-            }
-        } else {
-            for (int y = row + (iy - (iy - col)), x = 0; y >= 0; --y, ++x){
-                if (y == row) continue;
-                board[y][x]++;
-            }
-        }
+		//Block right horizontals
+		const unsigned iy = N - row - 1;
+		if (iy <= col){
+			for (unsigned y = N - 1, x = col - iy; x < N; --y, ++x){
+				if (y == row) continue;
+				board[y][x]++;
+			}
+		} else {
+			for (unsigned y = row + (iy - (iy - col)), x = 0; y < N; --y, ++x){ //y will overflow to above n when -1
+				if (y == row) continue;
+				board[y][x]++;
+			}
+		}
 
-        //mark all integer intersections of spies lined up
-        for (unsigned i = row + 1; i < N; ++i){
+		//mark all integer intersections of spies lined up
+		for (unsigned i = row + 1; i < N; ++i){
 
-            unsigned rise = i - row; //Keep in mind that values increase down the board
-            int run = (int)pos[i] - (int)pos[row];
+			unsigned rise = i - row; //Keep in mind that values increase down the board
+			int run = (int)pos[i] - (int)pos[row];
 
-            unsigned startRow, startColumn;
-            if (row < 0){
-                //Solve for neg row
-                unsigned x = gcd(rise, -run);
-                if (x != 1){
-                    rise /= x;
-                    run = -(-run / x); //Fix errors around unsigned and signed ints.
-                }
+			int x = gcd(rise, abs(run));
+			if (x != 1){
+				rise /= x;
+				run /= x;
+			}
 
-                int fillx = (N - pos[row]) / -run; //We are now going the other way
-                int filly = row / rise;
+//			assert(run != 0 && rise != 0);
 
-                if (fillx >= filly){
-                    startRow = row - rise * filly;
-                    startColumn = pos[row] - run * filly;
-                } else {
-                    startRow = row - rise * fillx;
-                    startColumn = pos[row] - run * fillx;
-                }
+			int fillx, filly;
 
-            } else {
-                //Solve for pos row
-                unsigned x = gcd(rise, run);
-                if (x != 1){
-                    rise /= x;
-                    run = run / x;
-                }
+			unsigned startRow, startColumn;
+			if (run < 0){
+				//Solve for neg row
+				fillx = (N - 1 - pos[row]) / -run; //We are now going the other way
+				filly = row / rise;
 
-                int fillx = pos[row] / run;
-                int filly = row / rise;
+				if (fillx >= filly){
+					startRow = row - rise * filly;
+					startColumn = pos[row] - run * filly;
+				} else {
+					startRow = row - rise * fillx;
+					startColumn = pos[row] - run * fillx;
+				}
 
-                if (fillx >= filly){
-                    startRow = row - rise * filly;
-                    startColumn = pos[row] - run * filly;
-                } else {
-                    startRow = row - rise * fillx;
-                    startColumn = pos[row] - run * fillx;
-                }
+			} else {
+				//Solve for pos row
+				fillx = pos[row] / run;
+				filly = row / rise;
 
-            }
+				if (fillx >= filly){
+					startRow = row - rise * filly;
+					startColumn = pos[row] - run * filly;
+				} else {
+					startRow = row - rise * fillx;
+					startColumn = pos[row] - run * fillx;
+				}
 
-            for (unsigned r = startRow, c = startColumn; r < N && c < N; r += rise, c += run){
-                if (r == row || r == i) continue;
-                board[r][c]++;
-            }
+			}
 
-        }
+//			assert(abs(run) < N);
 
-    }
+//			assert(startRow < N && startColumn < N);
+
+			for (unsigned r = startRow, c = startColumn; r < N && c < N; r += rise, c += run){
+				if (r == row || r == i) continue;
+				board[r][c]++;
+			}
+
+		}
+
+	}
 
 }
 
 void solve(Board board){
 
-    while (!solved){
-        //Set initial positions randomly
-        vector<unsigned> pos(N);
-        for (unsigned i = 0; i < N; ++i){
-            pos[i] = i;
-        }
-        random_shuffle(pos.begin(), pos.end());
+	while (!solved){
+		//Set initial positions randomly
+		vector<unsigned> pos(N);
+		for (unsigned i = 0; i < N; ++i){
+			pos[i] = i;
+		}
+		random_shuffle(pos.begin(), pos.end());
 
-        vector<unsigned> ipos(N);
-        for (unsigned i = 0; i < N; ++i){
-            ipos[pos[i]] = i;
-        }
+		vector<unsigned> ipos(N);
+		for (unsigned i = 0; i < N; ++i){
+			ipos[pos[i]] = i;
+		}
 
-        int moves = maxMoves;
-        while (moves > 0 && !solved){
+//		games++;
+//		cv.notify_one();
 
-            //Set the attack levels on the board.
-            attack(board, pos);
+		int moves = maxMoves;
+		while (moves > 0 && !solved){
 
-            for (unsigned r = 0; r < N; ++r){
-                for (unsigned c = 0; c < N; ++c){
-                    if (pos[r] == c){
-                        cout << 'X';
-                    } else {
-                        if (board[r][c] == 0){
-                            cout << '-';
-                        } else {
-                            cout << board[r][c];
-                        }
-                    }
-                }
-                cout << endl;
-            }
-            cout << endl;
+			//Set the attack levels on the board.
+			attack(board, pos);
 
-            vector<unsigned> conflicted;
-            for (unsigned i = 0; i < N; ++i){
-                if (board[i][pos[i]] > 0){
-                    conflicted.push_back(i);
-                }
-            }
+#ifdef debug
+			for (unsigned r = 0; r < N; ++r){
+				for (unsigned c = 0; c < N; ++c){
+					if (pos[r] == c){
+						cout << 'X';
+					} else {
+						if (board[r][c] == 0){
+							cout << '-';
+						} else {
+							cout << board[r][c];
+						}
+					}
+				}
+				cout << endl;
+			}
+			cout << endl;
+#endif
 
-            if (conflicted.size() == 0 && !solved){ //Win and no other thread finished first.
+			vector<unsigned> conflicted;
+			for (unsigned i = 0; i < N; ++i){
+				if (board[i][pos[i]] > 0){
+					conflicted.push_back(i);
+				}
+			}
 
-                solved = true;
+			if (conflicted.size() == 0 && !solved){ //Win and no other thread finished first.
 
-                for (unsigned i : pos){
-                    cout << i << " ";
-                }
+				solved = true;
 
-                cout << endl;
+				for (unsigned i : pos){
+					cout << i + 1 << " ";
+				}
 
-                //Human readable version of the board
-                #ifdef debug
-                for (unsigned p : pos){
-                    for (unsigned i = 0; i < N; ++i){
-                        if (i == p){
-                            cout << '#';
-                        } else {
-                            cout << '-';
-                        }
-                    }
-                    cout << endl;
-                }
-                #endif
+				cout << endl;
 
-                return;
+				//Human readable version of the board
+#ifdef debug
+				for (unsigned p : pos){
+					for (unsigned i = 0; i < N; ++i){
+						if (i == p){
+							cout << '#';
+						} else {
+							cout << '-';
+						}
+					}
+					cout << endl;
+				}
+#endif
 
-            } else {
+//				cv.notify_one();
 
-                //Randomly choose a queen to move to its best position and continue.
-                thread_local random_device rand;
-                uniform_int_distribution<unsigned> pick(0, conflicted.size() - 1);
+				return;
 
-                unsigned row = conflicted[pick(rand)];
+			} else {
 
-                unsigned best = N;
-                unsigned a = N;
-                for (unsigned i = 0; i < N; ++i){
-                    if (board[row][i] < a){
-                        best = i;
-                        a = board[row][i];
-                    }
-                }
+				//Randomly choose a queen to move to its best position and continue.
+				thread_local random_device rand;
+				uniform_int_distribution<unsigned> pick(0, conflicted.size() - 1);
 
-                swap(pos[row], pos[ipos[best]]);
-                swap(ipos[best], ipos[pos[ipos[best]]]);
+				unsigned row = conflicted[pick(rand)];
 
-            }
+				unsigned best = N;
+				unsigned a = N;
+				for (unsigned i = 0; i < N; ++i){
+					if (board[row][i] < a){
+						best = i;
+						a = board[row][i];
+					}
+				}
 
-            moves--;
+				swap(pos[row], pos[ipos[best]]);
+				swap(ipos[best], ipos[pos[ipos[best]]]);
 
-        }
+			}
 
-    }
+			moves--;
+
+		}
+
+	}
 
 }
 
 
 int main(){
 
-    vector<vector<unsigned> > board(N, vector<unsigned>(N));
+	vector<vector<unsigned> > board(N, vector<unsigned>(N));
 
-    //Start the problem a few times, one will complete first.
-    vector<thread> threads(tc);
-    for (unsigned i = 0; i < tc; ++i){
-        threads[i] = thread(solve, board);
-    }
+	//Start the problem a few times, one will complete first.
+	vector<thread> threads(tc);
+	for (unsigned i = 0; i < tc; ++i){
+		threads[i] = thread(solve, board);
+	}
 
-    //Run it on main thread too.
-    solve(board);
+//	mutex lck;
 
-    for (thread& t : threads){
-        t.join();
-    }
+//	while(!solved){
+//		unique_lock<mutex> ulck(lck);
+//		cv.wait(ulck);
+//		cout << "Games: " << games.load() << "\r";
+//	}
 
-    return 0;
+	for (thread& t : threads){
+		t.join();
+	}
+
+	return 0;
 }
