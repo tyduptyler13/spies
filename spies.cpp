@@ -3,11 +3,13 @@
 #include <thread>
 #include <iostream>
 #include <random>
+#include <algorithm>
 using namespace std;
 
 #define N 8
 #define tc 0
-#define maxMoves 25
+#define maxMoves 2 * N
+#define debug
 
 typedef vector<vector<unsigned> > Board;
 
@@ -24,22 +26,27 @@ inline unsigned gcd( int x, int y ){
         y = f;
     }
     return x;
-}  
+}
 
 void attack(Board& board, const vector<unsigned>& pos){
-    
+
+    for (auto& row : board){ //Reset all the attack values in the board.
+        fill(row.begin(), row.end(), 0);
+    }
+
     for (unsigned row = 0; row < N; ++row){
-        
+
         const unsigned col = pos[row];
-        
+
         //Block out cols
+        /* We can skip this now that all positions are force to be on their own row and column via swap
         for (unsigned i = 0; i < N; ++i){
             //increment every rows column equal to this queens col, skip this row.
             if (i == row) continue;
             board[i][col]++;
         }
-        
-        
+        */
+
         //Block left horizontals
         if (col <= row){
             for (unsigned y = row - col, x = 0; y < N; ++x, ++y){ //y will grow to N faster so skip checking x
@@ -47,12 +54,12 @@ void attack(Board& board, const vector<unsigned>& pos){
                 board[y][x]++;
             }
         } else {
-            for (unsigned y = 0; x = col - row; x < N; ++x, ++y){
+            for (unsigned y = 0, x = col - row; x < N; ++x, ++y){
                 if (y == row) continue; //Skip ourself, we can't attack ourself
                 board[y][x]++;
             }
         }
-        
+
         //Block right horizontals
         const unsigned iy = N - row - 1;
         if (iy <= col){
@@ -61,35 +68,106 @@ void attack(Board& board, const vector<unsigned>& pos){
                 board[y][x]++;
             }
         } else {
-            for (unsigned y = row - iy, x = 0; y >= 0; --y; ++x){
+            for (int y = row + (iy - (iy - col)), x = 0; y >= 0; --y, ++x){
                 if (y == row) continue;
                 board[y][x]++;
             }
         }
-        
-        //TODO mark all integer intersections of spies lined up
-        
-        
+
+        //mark all integer intersections of spies lined up
+        for (unsigned i = row + 1; i < N; ++i){
+
+            unsigned rise = i - row; //Keep in mind that values increase down the board
+            int run = (int)pos[i] - (int)pos[row];
+
+            unsigned startRow, startColumn;
+            if (row < 0){
+                //Solve for neg row
+                unsigned x = gcd(rise, -run);
+                if (x != 1){
+                    rise /= x;
+                    run = -(-run / x); //Fix errors around unsigned and signed ints.
+                }
+
+                int fillx = (N - pos[row]) / -run; //We are now going the other way
+                int filly = row / rise;
+
+                if (fillx >= filly){
+                    startRow = row - rise * filly;
+                    startColumn = pos[row] - run * filly;
+                } else {
+                    startRow = row - rise * fillx;
+                    startColumn = pos[row] - run * fillx;
+                }
+
+            } else {
+                //Solve for pos row
+                unsigned x = gcd(rise, run);
+                if (x != 1){
+                    rise /= x;
+                    run = run / x;
+                }
+
+                int fillx = pos[row] / run;
+                int filly = row / rise;
+
+                if (fillx >= filly){
+                    startRow = row - rise * filly;
+                    startColumn = pos[row] - run * filly;
+                } else {
+                    startRow = row - rise * fillx;
+                    startColumn = pos[row] - run * fillx;
+                }
+
+            }
+
+            for (unsigned r = startRow, c = startColumn; r < N && c < N; r += rise, c += run){
+                if (r == row || r == i) continue;
+                board[r][c]++;
+            }
+
+        }
+
     }
-    
+
 }
 
 void solve(Board board){
-    
+
     while (!solved){
         //Set initial positions randomly
         vector<unsigned> pos(N);
-        random_device rand;
-        uniform_int_distribution<unsigned> dist(0,N);
-        for (unsigned& r : pos){
-            r = dist(rand);
+        for (unsigned i = 0; i < N; ++i){
+            pos[i] = i;
         }
-        
-        const int moves = maxMoves;
-        while (maxMoves > 0 && !solved){
-        
+        random_shuffle(pos.begin(), pos.end());
+
+        vector<unsigned> ipos(N);
+        for (unsigned i = 0; i < N; ++i){
+            ipos[pos[i]] = i;
+        }
+
+        int moves = maxMoves;
+        while (moves > 0 && !solved){
+
             //Set the attack levels on the board.
             attack(board, pos);
+
+            for (unsigned r = 0; r < N; ++r){
+                for (unsigned c = 0; c < N; ++c){
+                    if (pos[r] == c){
+                        cout << 'X';
+                    } else {
+                        if (board[r][c] == 0){
+                            cout << '-';
+                        } else {
+                            cout << board[r][c];
+                        }
+                    }
+                }
+                cout << endl;
+            }
+            cout << endl;
 
             vector<unsigned> conflicted;
             for (unsigned i = 0; i < N; ++i){
@@ -98,54 +176,79 @@ void solve(Board board){
                 }
             }
 
-            if (conflicted == 0 && !solved){ //Win and no other thread finished first.
-                
+            if (conflicted.size() == 0 && !solved){ //Win and no other thread finished first.
+
                 solved = true;
-            
-                for (auto& r : board){
-                    
-                    for (unsigned i : r){
-                        
-                        cout << i;
-                        
-                    }
-                    
-                    cout << endl;
-                    
+
+                for (unsigned i : pos){
+                    cout << i << " ";
                 }
-            
+
+                cout << endl;
+
+                //Human readable version of the board
+                #ifdef debug
+                for (unsigned p : pos){
+                    for (unsigned i = 0; i < N; ++i){
+                        if (i == p){
+                            cout << '#';
+                        } else {
+                            cout << '-';
+                        }
+                    }
+                    cout << endl;
+                }
+                #endif
+
+                return;
+
             } else {
-                
+
                 //Randomly choose a queen to move to its best position and continue.
-                
-                
+                thread_local random_device rand;
+                uniform_int_distribution<unsigned> pick(0, conflicted.size() - 1);
+
+                unsigned row = conflicted[pick(rand)];
+
+                unsigned best = N;
+                unsigned a = N;
+                for (unsigned i = 0; i < N; ++i){
+                    if (board[row][i] < a){
+                        best = i;
+                        a = board[row][i];
+                    }
+                }
+
+                swap(pos[row], pos[ipos[best]]);
+                swap(ipos[best], ipos[pos[ipos[best]]]);
+
             }
-        
+
+            moves--;
+
         }
-        
-        
-        
+
     }
-    
+
 }
 
 
 int main(){
-    
+
     vector<vector<unsigned> > board(N, vector<unsigned>(N));
-    
+
     //Start the problem a few times, one will complete first.
     vector<thread> threads(tc);
     for (unsigned i = 0; i < tc; ++i){
         threads[i] = thread(solve, board);
     }
-    
+
     //Run it on main thread too.
     solve(board);
-    
+
     for (thread& t : threads){
         t.join();
     }
-    
+
     return 0;
 }

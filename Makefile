@@ -1,4 +1,4 @@
-CFLAGS=-Wall -Wextra -pedantic -O3 -march=native -std=c++11
+CFLAGS=-Wall -Wextra -pedantic -march=native -std=c++11 -g -O
 
-all:
-	$(CC) $(CFLAGS) spies.cpp -o spies
+all: spies.cpp Makefile
+	$(CXX) $(CFLAGS) spies.cpp -o spies
