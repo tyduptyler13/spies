@@ -11,12 +11,10 @@
 //#include <cassert>
 using namespace std;
 
-#define N 41
-#define tc 8
-#define maxMoves 15
+#define N 35
+#define tc thread::hardware_concurrency()
+#define maxMoves 3 * N
 //#define debug
-
-typedef vector<vector<unsigned> > Board;
 
 volatile bool solved = false; //For stopping other threads early.
 //atomic_uint games;
@@ -35,7 +33,7 @@ inline int gcd( int x, int y ){
 	return x;
 }
 
-void attack(Board& board, const vector<unsigned>& pos){
+void attack(vector<vector<unsigned> >& board, const vector<unsigned>& pos){
 
 	for (auto& row : board){ //Reset all the attack values in the board.
 		fill(row.begin(), row.end(), 0);
@@ -141,7 +139,10 @@ void attack(Board& board, const vector<unsigned>& pos){
 
 }
 
-void solve(Board board){
+void solve(){
+
+	thread_local vector<vector<unsigned> > board(N, vector<unsigned>(N));
+	thread_local random_device rand;
 
 	while (!solved){
 		//Set initial positions randomly
@@ -156,8 +157,8 @@ void solve(Board board){
 			ipos[pos[i]] = i;
 		}
 
-//		games++;
-//		cv.notify_one();
+		//		games++;
+		//		cv.notify_one();
 
 		int moves = maxMoves;
 		while (moves > 0 && !solved){
@@ -214,29 +215,46 @@ void solve(Board board){
 				}
 #endif
 
-//				cv.notify_one();
+				//				cv.notify_one();
 
 				return;
 
 			} else {
 
-				//Randomly choose a queen to move to its best position and continue.
-				thread_local random_device rand;
 				uniform_int_distribution<unsigned> pick(0, conflicted.size() - 1);
 
-				unsigned row = conflicted[pick(rand)];
+				unsigned tries = conflicted.size();
 
-				unsigned best = N;
-				unsigned a = N;
-				for (unsigned i = 0; i < N; ++i){
-					if (board[row][i] < a){
-						best = i;
-						a = board[row][i];
+				while(tries--){
+
+					unsigned rowA = conflicted[pick(rand)];
+
+					int bestImprovement = 0;
+					unsigned rowB = N;
+
+					for (unsigned col = 0; col < N; ++col){
+						if (col == pos[rowA]) continue;
+
+						int change = (int)board[rowA][pos[rowA]] - (int)board[rowA][col]
+									+ (int)board[ipos[col]][col] - (int)board[ipos[col]][pos[rowA]];
+
+						if (change > bestImprovement){
+							rowB = ipos[col];
+							bestImprovement = change;
+						}
+
 					}
+
+					if (rowB == N) continue;
+
+					swap(pos[rowA], pos[rowB]); //Switch the values in pos
+					swap(ipos[pos[rowA]], ipos[pos[rowB]]); //Switch the indexes in ipos
+					break;
 				}
 
-				swap(pos[row], pos[ipos[best]]);
-				swap(ipos[best], ipos[pos[ipos[best]]]);
+				if (tries == 0){
+					break; //This initial condition failed try another.
+				}
 
 			}
 
@@ -251,21 +269,19 @@ void solve(Board board){
 
 int main(){
 
-	vector<vector<unsigned> > board(N, vector<unsigned>(N));
-
 	//Start the problem a few times, one will complete first.
 	vector<thread> threads(tc);
 	for (unsigned i = 0; i < tc; ++i){
-		threads[i] = thread(solve, board);
+		threads[i] = thread(solve);
 	}
 
-//	mutex lck;
+	//	mutex lck;
 
-//	while(!solved){
-//		unique_lock<mutex> ulck(lck);
-//		cv.wait(ulck);
-//		cout << "Games: " << games.load() << "\r";
-//	}
+	//	while(!solved){
+	//		unique_lock<mutex> ulck(lck);
+	//		cv.wait(ulck);
+	//		cout << "Games: " << games.load() << "\r";
+	//	}
 
 	for (thread& t : threads){
 		t.join();
