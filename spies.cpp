@@ -11,7 +11,7 @@
 //#include <cassert>
 using namespace std;
 
-#define N 35
+#define N 51
 #define tc thread::hardware_concurrency()
 #define maxMoves 3 * N
 //#define debug
@@ -22,7 +22,7 @@ volatile bool solved = false; //For stopping other threads early.
 
 //Board access: [row][column]
 
-inline int gcd( int x, int y ){
+inline unsigned gcd( unsigned x, unsigned y ){
 	if( x < y ) swap( x, y );
 
 	while( y > 0 ){
@@ -232,7 +232,8 @@ void solve(){
 					int bestImprovement = 0;
 					unsigned rowB = N;
 
-					for (unsigned col = 0; col < N; ++col){
+					for (unsigned c : conflicted){
+						unsigned col = pos[c];
 						if (col == pos[rowA]) continue;
 
 						int change = (int)board[rowA][pos[rowA]] - (int)board[rowA][col]
