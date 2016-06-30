@@ -9,11 +9,19 @@
 //#include <mutex>
 #include <cmath>
 //#include <cassert>
+#include <sstream>
+
+#include "gcd.h"
+
 using namespace std;
 
-#define N 51
+unsigned N;
+#ifndef PROFILING
 #define tc thread::hardware_concurrency()
-#define maxMoves 3 * N
+#else
+#define tc 1
+#endif
+#define maxMoves 50
 //#define debug
 
 volatile bool solved = false; //For stopping other threads early.
@@ -21,17 +29,6 @@ volatile bool solved = false; //For stopping other threads early.
 //condition_variable cv;
 
 //Board access: [row][column]
-
-inline unsigned gcd( unsigned x, unsigned y ){
-	if( x < y ) swap( x, y );
-
-	while( y > 0 ){
-		const int f = x % y;
-		x = y;
-		y = f;
-	}
-	return x;
-}
 
 void attack(vector<vector<unsigned> >& board, const vector<unsigned>& pos){
 
@@ -42,15 +39,6 @@ void attack(vector<vector<unsigned> >& board, const vector<unsigned>& pos){
 	for (unsigned row = 0; row < N; ++row){
 
 		const unsigned col = pos[row];
-
-		//Block out cols
-		/* We can skip this now that all positions are force to be on their own row and column via swap
-        for (unsigned i = 0; i < N; ++i){
-            //increment every rows column equal to this queens col, skip this row.
-            if (i == row) continue;
-            board[i][col]++;
-        }
-		 */
 
 		//Block left horizontals
 		if (col <= row){
@@ -91,8 +79,6 @@ void attack(vector<vector<unsigned> >& board, const vector<unsigned>& pos){
 				run /= x;
 			}
 
-//			assert(run != 0 && rise != 0);
-
 			int fillx, filly;
 
 			unsigned startRow, startColumn;
@@ -124,10 +110,6 @@ void attack(vector<vector<unsigned> >& board, const vector<unsigned>& pos){
 
 			}
 
-//			assert(abs(run) < N);
-
-//			assert(startRow < N && startColumn < N);
-
 			for (unsigned r = startRow, c = startColumn; r < N && c < N; r += rise, c += run){
 				if (r == row || r == i) continue;
 				board[r][c]++;
@@ -139,10 +121,10 @@ void attack(vector<vector<unsigned> >& board, const vector<unsigned>& pos){
 
 }
 
-void solve(){
+void solve(const int seed){
 
 	thread_local vector<vector<unsigned> > board(N, vector<unsigned>(N));
-	thread_local random_device rand;
+	thread_local default_random_engine rand(seed);
 
 	while (!solved){
 		//Set initial positions randomly
@@ -268,12 +250,29 @@ void solve(){
 }
 
 
-int main(){
+int main(int argc, char** argv){
+
+	if (argc < 2){
+		cout << "You must supply the N you are solving for." << endl;
+		return 0;
+	}
+
+	stringstream ss;
+	ss << argv[1];
+	ss >> N;
+
+	if (N < 4){
+		cout << "N must be greater than 4." << endl;
+		return 0;
+	}
+
+	//Pregenerate all the random seeds
+	random_device rand;
 
 	//Start the problem a few times, one will complete first.
 	vector<thread> threads(tc);
 	for (unsigned i = 0; i < tc; ++i){
-		threads[i] = thread(solve);
+		threads[i] = thread(solve, rand());
 	}
 
 	//	mutex lck;

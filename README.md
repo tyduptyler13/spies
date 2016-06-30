@@ -1,30 +1,23 @@
-     ,-----.,--.                  ,--. ,---.   ,--.,------.  ,------.
-    '  .--./|  | ,---. ,--.,--. ,-|  || o   \  |  ||  .-.  \ |  .---'
-    |  |    |  || .-. ||  ||  |' .-. |`..'  |  |  ||  |  \  :|  `--, 
-    '  '--'\|  |' '-' ''  ''  '\ `-' | .'  /   |  ||  '--'  /|  `---.
-     `-----'`--' `---'  `----'  `---'  `--'    `--'`-------' `------'
-    ----------------------------------------------------------------- 
+Spies
+=====
 
+This is a program designed to figure out solutions to a problem similar to n queens.
 
-Hi there! Welcome to Cloud9 IDE!
+This problem is harder than n queens in that it has all of the same rules and one extra preventing any three "queen"s/spies from being in line with eachother. Finding solutions without this restriction is much easier and faster. If you are just looking to solve N queens, feel free to comment out the for loop with the comment "mark all integer intersections of spies lined up" above and it will solve the original N queens problem with ease.
 
-To get you started with C/C++, we have created some small hello world
-applications and a Makefile.
+Usage
+-----
 
-Have a look at the files, and use the terminal to build them:
+Simply run `make` then run spies with the size of the board you wish to use.
 
-    $ make
-    $ ./hello-c-world
-    $ ./hello-cpp-world
+`./spies [N]`
 
-We're sure you can take it from there. Go ahead and edit the code, 
-or add some new files. It's all up to you! 
+Special Usage
+-------------
+This program can be optimized with profile guided optimization. To do so, simply run `make profile` followed by `./spies-profile [N]` where N can be any size, it is recommended to keep N around 30 to give the profile a good idea of what to expect in your program while not taking too long. Then run `make profiled` and the `spies` executable will now be optimized even better than before.
 
-Happy coding!
-The Cloud9 IDE team
+Future
+------
 
+In the future there may also be an opencl version of spies to see if it brings any speed up to the table.
 
-## Support & Documentation
-
-Visit http://docs.c9.io for support, or to learn more about using Cloud9 IDE. 
-To watch some training videos, visit http://www.youtube.com/user/c9ide
